@@ -1,14 +1,50 @@
+var incubationperiod=14; //this would change based on the science, probably need to allow time for a reporting delay
+var bumpdb=''; //the database is in global scope
+
+
 $().ready(function(){
+
+  if (!('indexedDB' in window)) {
+    window.alert("This browser doesn't support IndexedDB so Bump can't work");
+    return;
+  }
+  var dbPromise=indexedDB.open('bump',1); //the version number is an integer, incrementing it would be to change the object stores
+
+  dbPromise.onerror=function(event){
+    //this could happen in incognito mode, or if the device asks permission to create an indexeddb
+    //
+    window.alert("Failed to create a local contacts database on this device, the application isn't going to work.");
+  }
+  dbPromise.onsuccess=function(event){
+    bumpdb=dbPromise.result;
+    loadbump(); //this sets up the main page with the QR code and video, we first call it when the database is ready to start
+  }
+  dbPromise.onupgradeneeded=function(event){
+    //creating a few buckets in the database to store different types of object
+    //this is called on first use or schema update
+    var upgradeDB=event.target.result;
+    if(!upgradeDB.objectStoreNames.contains('settings')){
+      var deetsdb=upgradeDB.createObjectStore('settings');
+    }
+    if(!upgradeDB.objectStoreNames.contains('interactions')){
+      upgradeDB.createObjectStore('interactions',{keyPath:['interactionid']});
+    }
+    if(!upgradeDB.objectStoreNames.contains('contacts')){
+      upgradeDB.createObjectStore('contacts',{keyPath:['interactionid']});
+    }
+  }
+
+
+
   //make the tab navigation work
   $('a[data-toggle="tab"]').on('show.bs.tab', function (e) {
     console.log(e.target) // newly activated tab
   });
 
-  loadbump();
+  //but we have to call it the first time when there is no tab event
   $('a[data-target="#home"]').on('show.bs.tab', function (e) {
     console.log("create new interaction");
     loadbump();
-    //want to do this on initial load of the app too.
   });
 
   $('a[data-target="#home"]').on('hide.bs.tab', function (e) {
@@ -24,19 +60,26 @@ $().ready(function(){
     deets.phone=$("#myPhone").val();
     deets.email=$("#myEmail").val();
     deets.consent=$("#shareconsent").prop("checked");
-    localStorage.setItem("deets",JSON.stringify(deets));
+    var reqest=bumpdb.transaction(["settings"],"readwrite")
+       .objectStore("settings")
+       .put(deets,"deets");
   });
 
   $('a[data-target="#deets"]').on('show.bs.tab', function (e) {
     console.log("load deets");
-    var deets=JSON.parse(localStorage.getItem("deets"));
-    if (deets){
-      console.log(deets);
-      $("#myName").val(deets.name);
-      $("#myPhone").val(deets.phone);
-      $("#myEmail").val(deets.email);
-      $("#shareconsent").prop("checked",deets.consent);
-    }
+     var request=bumpdb.transaction(["settings"])
+      .objectStore("settings")
+      .get("deets");
+      request.onsuccess=function(event){
+       var deets=request.result;
+       if (deets){
+        console.log(deets);
+        $("#myName").val(deets.name);
+        $("#myPhone").val(deets.phone);
+        $("#myEmail").val(deets.email);
+        $("#shareconsent").prop("checked",deets.consent);
+        }
+      }
   });
 
   $('a[data-target="#contacts"]').on('show.bs.tab', function (e) {
@@ -117,14 +160,20 @@ function loadbump(){
   interactionstoday.push(interactionid);
   localStorage.setItem(today,JSON.stringify(interactionstoday.sort()));
   $('#bumpQR').html('');
-  var deets=JSON.parse(localStorage.getItem("deets"));
-  if (deets && deets.consent){
-    //QR code with contact details is blue. Not red because it isn't a danger, and because people are red/green colourblind
-    new QRCode(document.getElementById("bumpQR"),{text:JSON.stringify({interaction:interactionid,deets:deets}),colorDark:"#000066"});
-  }else{
-    //they don't currently want to give out info, so we don't. QR code is dark green
-    new QRCode(document.getElementById("bumpQR"),{text:JSON.stringify({interaction:interactionid}),colorDark:"#006600"});
-  }
+     var request=bumpdb.transaction(["settings"])
+      .objectStore("settings")
+      .get("deets");
+      request.onsuccess=function(event){
+       var deets=request.result;
+       if (deets && deets.consent){
+          //QR code with contact details is blue. Not red because it isn't a danger, and because people are red/green colourblind  
+          new QRCode(document.getElementById("bumpQR"),{text:JSON.stringify({interaction:interactionid,deets:deets}),colorDark:"#000066"});
+        }else{
+          //they don't currently want to give out info, so we don't. QR code is dark green
+          new QRCode(document.getElementById("bumpQR"),{text:JSON.stringify({interaction:interactionid}),colorDark:"#006600"});
+        }
+      }
+
 
     // Use facingMode: environment to attemt to get the front camera on phones
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
@@ -173,11 +222,13 @@ function loadbump(){
             var result=JSON.parse(code.data);
             if (result.diagnosis){
               //we just scanned a diagnosis code issued to us by a doctor. That means we need to upload our contacts to the server
-              window.alert ("you have been diagnosed, we would now send your recent contacts to the server");
+              window.alert ("You have been diagnosed. Your recent interactions will be sent to the server, but not their contact details.");
+              window.alert ("People you bumped into will be notified that they met someone who has now been diagnosed.");
               var foundQR=true;
               //each track (audio and video) of the stream needs to be stopped to turn off the camera
               video.srcObject.getTracks().forEach(track => track.stop());
               $("#vidcanvas").hide(3000); //having read a QR code we remove the image to show we did something.
+              
             }else if(result.interaction){
               console.log ("you have bumped into someone");
               console.log(result);

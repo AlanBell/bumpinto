@@ -43,7 +43,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 				//here we are accepting user supplied data, and we will be putting it in our database
 				//we will also be serving it back up to other people
 				//so we need to check it is what we are expecting
-				//only for the arbitary string though, the date will be sorted by the prepared statement
+				//only for the arbitary string though, the interaction date will be validated by the prepared statement
 				//using regex to validate it is a uuid
 				if(preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',$interaction)){
 					$stmt = $mysqli->prepare("insert into interactions (interactionid,interactiondate,reporteddate) values (?,?,?)");
@@ -57,7 +57,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 		}
 	}else{
 		//no diagnosis code found?
-		echo "Diagnoisis code not accepted";
+		echo "Diagnosis code not accepted";
 	}
 
 }else{

@@ -23,7 +23,9 @@ else{
     include "dbcredentials.php";
 }
 $mysqli = new mysqli($server, $user, $password, $database);
-$stmt = $mysqli->prepare("insert into diagnosis (diagnosisid) values (?)");
+$stmt = $mysqli->prepare("insert into diagnosis (diagnosisid) values (?,'self')");
+//creating a diagnosis code in the database, with self as the authority - there could be other diagnosis authorites where people get the diagnosis QR from a doctor
+//or from an official test result
 $stmt->bind_param("s",$diagnosiscode);
 $stmt->execute();
 
@@ -36,7 +38,7 @@ $stmt->execute();
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
-    <title>Bump Doctor Diagnosis</title>
+    <title>Bump Self Diagnosis</title>
 </head>
 <body>
 <nav class="navbar navbar-expand-sm  navbar-dark bg-dark">
@@ -51,10 +53,12 @@ $stmt->execute();
 </nav>
 
 
-<p>This is a diagnois code QR that you can put on a letter to the patient.
-It has been stored in the database when you opened this page, refreshing the page gives you a new diagnosis code.</p>
-<p>If this application was being used in a real world situtaion this page would be replaced with a more formal process that is only open to registered doctors.</p>
-<p>When the patient scans this code with their phone it will upload their contacts which will be accepted by the server if the diagnosis code is valid and unused.</p>
+<p>This is a diagnois code that you can scan with your phone</p>
+<p>Your phone will then inform the server of your recent contact ids but it will pass no contact information whatsoever</p>
+<p>People you have recently bumped into will be informed that someone they met has self-diagnosed.</p>
+<p>If they scanned your contact information (blue code) then they will see that you have self-diagnosed.</p>
+<p>You might want to contact people in your app directly and anyone else you have recently been in meaningful contact with.</p>
+<p>Get well soon, and self isolate to avoid making any new contacts.</p>
 
     <div id="qrcode" style="margin:10px;"></div>
 
