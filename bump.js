@@ -8,7 +8,7 @@ $().ready(function(){
     window.alert("This browser doesn't support IndexedDB so Bump can't work");
     return;
   }
-  var dbPromise=indexedDB.open('bump',1); //the version number is an integer, incrementing it would be to change the object stores
+  var dbPromise=indexedDB.open('bump',6); //the version number is an integer, incrementing it would be to change the object stores
 
   dbPromise.onerror=function(event){
     //this could happen in incognito mode, or if the device asks permission to create an indexeddb
@@ -27,10 +27,10 @@ $().ready(function(){
       var deetsdb=upgradeDB.createObjectStore('settings');
     }
     if(!upgradeDB.objectStoreNames.contains('interactions')){
-      upgradeDB.createObjectStore('interactions',{keyPath:['interactionid']});
+      upgradeDB.createObjectStore('interactions',{keyPath:'interactionid'});
     }
     if(!upgradeDB.objectStoreNames.contains('contacts')){
-      upgradeDB.createObjectStore('contacts',{keyPath:['interactionid']});
+      upgradeDB.createObjectStore('contacts',{keyPath:'interactionid'});
     }
   }
 
@@ -83,7 +83,19 @@ $().ready(function(){
   });
 
   $('a[data-target="#contacts"]').on('show.bs.tab', function (e) {
-loadcontacts();
+    loadcontacts();
+  });
+
+  $('a[data-target="#server"]').on('show.bs.tab', function (e) {
+    $("#serverinteractions").html('');
+
+    $.ajax("/codes",{"success":function(data){
+      data.forEach(function(item){
+        $("#serverinteractions").append(  '<li class="list-group-item d-flex flex-row"><b>'+item.interactionid+'</b> Interaction date:'+item.interactiondate+' Reported on '+item.reporteddate+'</li>');
+        checkinteraction(item.interactionid);
+      });
+     }
+    });
   });
 
 
@@ -91,11 +103,20 @@ loadcontacts();
     console.log("load debug");
     // this is just for transparency, will probably be visible only with a URL parameter
     $("#debugstorage").html('');
-    Object.keys(localStorage).forEach(function(key){
-      $("#debugstorage").append(  '<li class="list-group-item d-flex flex-row"><b>'+key+':</b> '+localStorage.getItem(key)+'</li>');
-    });
-
+    var transaction=bumpdb.transaction("interactions","readonly");
+    var objectStore=transaction.objectStore("interactions");
+    var request=objectStore.openCursor();
+    request.onsuccess= function(event){
+      var cursor=event.target.result;
+      if(cursor){
+        //if this is a contact key we want to show a pretty info card about this contact who shared their details with us
+        //TODO delete from object store rather than localstorage
+        $("#debugstorage").append(  '<li class="list-group-item d-flex flex-row"><b>'+cursor.value.interactionid+':</b> '+cursor.value.date+'</li>');
+        cursor.continue();
+       }
+    }
   })
+
 
 
   //populate the QR code on the share page
@@ -105,30 +126,52 @@ loadcontacts();
 
 });
 
+function checkinteraction(interactionid){
+  var transaction=bumpdb.transaction("interactions","readonly");
+  var objectStore=transaction.objectStore("interactions");
+  var request=objectStore.get(interactionid);
+    request.onsuccess= function(event){
+      if(request.result){
+        //how do we avoid alerting on stuff we uploaded?
+        //great 
+        window.alert("Oh dear, an interaction on the server matches one you have - "+request.result.interactionid);
+      }
+    }
+}
 
+function removeContact(interactionid){
+	//this removes the information about a contact and turns them into an anonymous interaction
+    var transaction=bumpdb.transaction("contacts","readwrite"); 
+    var objectStore=transaction.objectStore("contacts");
+    var request=objectStore.delete(interactionid);
+    request.onsuccess= function(event){
+       console.log("anonymised someone");
+    }
+}
 
 function loadcontacts(){
     console.log("load contacts");
     $("#contactlist").html(''); //clearing the list so we can repopulate it
-    Object.keys(localStorage).forEach(function(key){
-      //if this is a contact key we want to show a pretty info card about this contact who shared their details with us
-      try {
-        lsitem=JSON.parse(localStorage.getItem(key));
-        if(lsitem.contact){
-          $("#contactlist").append(  '<li class="list-group-item d-flex flex-row"><div class="d-flex flex-column flex-lg-row flex-grow-1 justify-content-around">'
-         	+'<h3>' + lsitem.contact.name + '</h3>'
-         	+'<a href="tel:' + lsitem.contact.phone + '">' + lsitem.contact.phone + '</a>'
-         	+'<a href="mail:' + lsitem.contact.email + '">' + lsitem.contact.email + '</a>'
+    var transaction=bumpdb.transaction("contacts","readonly");
+    var objectStore=transaction.objectStore("contacts");
+    var request=objectStore.openCursor();
+    request.onsuccess= function(event){
+      var cursor=event.target.result;
+      if(cursor){
+        //if this is a contact key we want to show a pretty info card about this contact who shared their details with us
+        //TODO delete from object store rather than localstorage
+	interactionid=cursor.value.interactionid;
+	deets=cursor.value.deets;
+        $("#contactlist").append(  '<li class="list-group-item d-flex flex-row"><div class="d-flex flex-column flex-lg-row flex-grow-1 justify-content-around">'
+         	+'<h3>' + deets.name + '</h3>'
+         	+'<a href="tel:' + deets.phone + '">' + deets.phone + '</a>'
+         	+'<a href="mail:' + deets.email + '">' + deets.email + '</a>'
 		+'</div>'
-        	+'<button type="button" class="btn btn-outline-secondary flex-shrink-1" onclick="localStorage.removeItem(\''+key+'\');loadcontacts()">&#x1f5d1;</button>'
+        	+'<button type="button" class="btn btn-outline-secondary flex-shrink-1" onclick="removeContact(\''+interactionid+'\');loadcontacts()">&#x1f5d1;</button>'
 		+'</li>');
-        }
-      }catch(e){
-        //this shouldn't happen as everything we store in the localstorage parses as JSON
-        console.log(e);
-        console.log(key);
+        cursor.continue();
       }
-    });
+    }
 }
 
 
@@ -145,20 +188,20 @@ function loadcontacts(){
     var outputMessage = document.getElementById("outputMessage");
     var outputData = document.getElementById("outputData");
 
+function storeinteraction(interactionid){
+    var today=moment().format('yyyyMMDD');
+    var reqest=bumpdb.transaction(["interactions"],"readwrite")
+       .objectStore("interactions")
+       .put({"date":today,"interactionid":interactionid}); //the interactionid is the key and today is the content
+}
+
 function loadbump(){
   //we start by registering a new interaction and saving it to the storage
   var interactionid=uuidv4();
   var today=moment().format('yyyyMMDD');
-  //add that uuid to the list of interactions today - in a non-sequential order so we sort it.
-  var interactionstoday=JSON.parse(localStorage.getItem(today));
-  if(!interactionstoday){
-      //this is the first time the app has been used to record an interaction today
-      //initialise the array of interactions today
-      //we always store the uuid even if nobody scans it, this means the device has no information about the number of people met
-      interactionstoday=[];
-  }
-  interactionstoday.push(interactionid);
-  localStorage.setItem(today,JSON.stringify(interactionstoday.sort()));
+
+  storeinteraction(interactionid);
+
   $('#bumpQR').html('');
      var request=bumpdb.transaction(["settings"])
       .objectStore("settings")
@@ -167,10 +210,10 @@ function loadbump(){
        var deets=request.result;
        if (deets && deets.consent){
           //QR code with contact details is blue. Not red because it isn't a danger, and because people are red/green colourblind  
-          new QRCode(document.getElementById("bumpQR"),{text:JSON.stringify({interaction:interactionid,deets:deets}),colorDark:"#000066"});
+          new QRCode(document.getElementById("bumpQR"),{text:JSON.stringify({"interactionid":interactionid,"deets":deets}),colorDark:"#000066"});
         }else{
           //they don't currently want to give out info, so we don't. QR code is dark green
-          new QRCode(document.getElementById("bumpQR"),{text:JSON.stringify({interaction:interactionid}),colorDark:"#006600"});
+          new QRCode(document.getElementById("bumpQR"),{text:JSON.stringify({"interactionid":interactionid}),colorDark:"#006600"});
         }
       }
 
@@ -221,16 +264,17 @@ function loadbump(){
           try{
             var result=JSON.parse(code.data);
             if (result.diagnosis){
-              //we just scanned a diagnosis code issued to us by a doctor. That means we need to upload our contacts to the server
-              window.alert ("You have been diagnosed. Your recent interactions will be sent to the server, but not their contact details.");
-              window.alert ("People you bumped into will be notified that they met someone who has now been diagnosed.");
               var foundQR=true;
               //each track (audio and video) of the stream needs to be stopped to turn off the camera
               video.srcObject.getTracks().forEach(track => track.stop());
               $("#vidcanvas").hide(3000); //having read a QR code we remove the image to show we did something.
-              
-            }else if(result.interaction){
-              console.log ("you have bumped into someone");
+              //we just scanned a diagnosis code issued to us by a doctor. That means we need to upload our contacts to the server
+              window.alert ("You have been diagnosed. Your recent interactions will be sent to the server, but not their contact details.");
+              window.alert ("People you bumped into will be notified that they met someone who has now been diagnosed.");
+              window.alert ("This isn't working yet!");
+
+            }else if(result.interactionid){
+              console.log ("You have bumped into someone");
               console.log(result);
               var foundQR=true;
               //each track (audio and video) of the stream needs to be stopped to turn off the camera
@@ -239,16 +283,13 @@ function loadbump(){
               //we do need to be a little bit careful of this information that has been provided by someone else
               //don't want them to be able to show us some kind of evil QR
               //first we store the interaction to todays bundle of interactions
-              var today=moment().format('yyyyMMDD');
-              var interactionstoday=JSON.parse(localStorage.getItem(today));
-              if(!interactionstoday){
-                interactionstoday=[];
-              }
-              interactionstoday.push(result.interaction);
-              localStorage.setItem(today,JSON.stringify(interactionstoday.sort()));
+              //need to store this in the object store, perhaps with a contact too
+              storeinteraction(result.interactionid);
               //if there are details we can save the contact
               if(result.deets){
-                localStorage.setItem(result.interaction,JSON.stringify({'contact':result.deets}));
+                var reqest=bumpdb.transaction(["contacts"],"readwrite")
+                  .objectStore("contacts")
+                  .put(result); //the interactionid is the key and today is the content
               }
 
             }

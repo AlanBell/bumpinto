@@ -1,9 +1,8 @@
 <?php
 /*
 This is the offline web app that users will see.
-It makes extensive use of localstorage API
+It stores data in a local indexedDB
 It allows them to set their contact details if they want to include them in the QR code.
-
 We might be able to make this a single static page of HTML, calling some dependencies from CDN
 
 */
@@ -18,6 +17,9 @@ We might be able to make this a single static page of HTML, calling some depende
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.4.1/flatly/bootstrap.min.css">
     <title>Bump Contact Diary</title>
+<style>
+ #bumpQR>img,#bumpQR>canvas{width:320px;}
+</style>
 </head>
 <body>
 
@@ -45,7 +47,10 @@ We might be able to make this a single static page of HTML, calling some depende
         <a data-toggle="tab" class="nav-link" href='#share' data-target="#share">Share Bump</a>
       </li>
       <li class="nav-item">
-        <a data-toggle="tab" class="nav-link" href='#debug' data-target="#debug">Debug info</a>
+        <a data-toggle="tab" class="nav-link" href='#debug' data-target="#debug">Local Data</a>
+      </li>
+      <li class="nav-item">
+        <a data-toggle="tab" class="nav-link" href='#server' data-target="#server">Check Server</a>
       </li>
   </ul>
 </div>
@@ -53,10 +58,10 @@ We might be able to make this a single static page of HTML, calling some depende
 
 <div class="tab-content">
   <div id="home" class="container tab-pane active">
-    <div id="bumpQR" style="margin:10px;"></div>
+    <div id="bumpQR" style=""></div>
 <hr/>
   <div id="loadingMessage">Looking for camera. . .</div>
-  <canvas id="vidcanvas" hidden></canvas>
+  <canvas id="vidcanvas" style="width:320px;height:240px;"hidden></canvas>
   <div id="output" hidden>
     <div id="outputMessage">No Bump Yet.</div>
     <div hidden><b>Data:</b> <span id="outputData"></span></div>
@@ -106,13 +111,22 @@ You can delete any of them, you will still be alerted if necessary.
     <h3>Confirm Diagnois</h3>
 If you have a diagnosis code you can scan it on the main page just like scanning a person and Bump will upload your recent interactions to the server.
 It won't include any details about who you are, or who you have met, just the last 14 days of interaction codes.
-Ideally there would be no possibility of self-diagnosis as that allows people to be idiots and scare others needlessly. Not clear what they would gain from this, but people are idiots.
-For testing purposes, you can go to https://www.bumpinto.eu/doctor.php to get a diagnosis code to scan.
+Ideally there would be no possibility of self-diagnosis as that allows people to be idiots and scare others needlessly. 
+Not clear what they would gain from this, but people are idiots.
+For testing purposes, you can go to <a href="https://www.bumpinto.eu/selfdiagnosis">https://www.bumpinto.eu/selfdiagnosis</a> to get a diagnosis code to scan.
   </div>
 
   <div id="debug" class="container tab-pane fade">
-    This is all the stuff in local storage
+    This is all of the interactions stored locally on your device and their dates. Some may be associated with contact details.
+    This is what will be uploaded to the server if you are diagnosed (and only if you are diagnosed),
+     it will be limited to the last few weeks (exact time period still to be defined).
+    Every day we also look at this data on the server to see if anyone has been diagnosed who shares an interaction with us.
     <ul class="list-group" id="debugstorage">
+    </ul>
+  </div>
+  <div id="server" class="container tab-pane fade">
+    This is all of the interactions reported to the server recently, you might share some of them, which should give you a notification when that is implemented.
+    <ul class="list-group" id="serverinteractions">
     </ul>
   </div>
 </div>
@@ -126,6 +140,6 @@ For testing purposes, you can go to https://www.bumpinto.eu/doctor.php to get a 
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
 
-<script src="bump.js"></script>
+<script src="bump.js?v=3"></script>
 </body>
 </html>

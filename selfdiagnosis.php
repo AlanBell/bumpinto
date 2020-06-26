@@ -4,7 +4,7 @@ This page is purely for testing purposes
 It provides a diagnosis code
 We have to create the diagnosis code on the server side
 */
-
+ini_set("display_errors","off");
 function guidv4(){
     //generates a reasonably good unique ID on windows or linux platforms
     //it doesn't really have to be perfect, and it shouldn't be high volume so we don't need to be too concerned about entropy, or waits for entropy.
@@ -23,7 +23,7 @@ else{
     include "dbcredentials.php";
 }
 $mysqli = new mysqli($server, $user, $password, $database);
-$stmt = $mysqli->prepare("insert into diagnosis (diagnosisid) values (?,'self')");
+$stmt = $mysqli->prepare("insert into diagnosis (diagnosisid,authority) values (?,'self')");
 //creating a diagnosis code in the database, with self as the authority - there could be other diagnosis authorites where people get the diagnosis QR from a doctor
 //or from an official test result
 $stmt->bind_param("s",$diagnosiscode);
