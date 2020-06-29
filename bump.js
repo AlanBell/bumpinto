@@ -17,7 +17,7 @@ $().ready(function(){
   }
   dbPromise.onsuccess=function(event){
     bumpdb=dbPromise.result;
-    loadbump(); //this sets up the main page with the QR code and video, we first call it when the database is ready to start
+    $('a[data-target="#home"]').tab('show'); //explicitly showing the home tab triggers the loading event and lets the hide event run on first departure
   }
   dbPromise.onupgradeneeded=function(event){
     //creating a few buckets in the database to store different types of object
@@ -49,7 +49,6 @@ $().ready(function(){
 
   $('a[data-target="#home"]').on('hide.bs.tab', function (e) {
     //on leaving the bump tab turn off the camera
-    //why isn't this firing on the first departure from the active tab?
     video.srcObject.getTracks().forEach(track => track.stop());
   });
 
